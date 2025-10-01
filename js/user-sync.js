@@ -27,10 +27,8 @@ function setUserId(newUserId) {
     // 保存新的用户ID
     localStorage.setItem(USER_ID_KEY, newUserId);
     
-    // 尝试加载云端数据
-    loadSyncedData();
-    
-    showToast('用户ID已设置，正在同步数据...', 'success');
+    // 移除自动加载云端数据的逻辑，应用按钮只用来确定和绑定ID
+    showToast('用户ID已设置', 'success');
     return true;
 }
 
