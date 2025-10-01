@@ -36,15 +36,22 @@ function setUserId(newUserId) {
 
 // 检查是否在Cloudflare环境中运行
 function isRunningInCloudflare() {
-    // 检查是否有特定的Cloudflare环境变量或标志
-    // 这个函数会在页面加载时更新
+    // 检查方法1: Cloudflare环境变量
     if (window.__CF && window.__CF.Cloudflare) {
         return true;
     }
     
-    // 检查URL主机名是否是Cloudflare Pages域名
+    // 检查方法2: Cloudflare Pages默认域名
     const hostname = window.location.hostname;
-    return hostname.endsWith('.pages.dev') || hostname.endsWith('.workers.dev');
+    if (hostname.endsWith('.pages.dev') || hostname.endsWith('.workers.dev')) {
+        return true;
+    }
+    
+    // 检查方法3: 尝试通过请求头或特定响应特征检测
+    // 这个函数在运行时会被多次调用，我们只需要返回一个保守的判断
+    // 对于自定义域名，我们采用默认策略：优先尝试云端同步
+    // 因为如果尝试失败，系统会自动降级到本地存储
+    return true;
 }
 
 // 获取需要同步的数据

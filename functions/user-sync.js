@@ -7,7 +7,8 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   
   // 定义KV命名空间 - 需要在Cloudflare Pages设置中绑定
-  const KV_NAMESPACE = env.LIBRETV_KV; // 用户需要在Cloudflare中创建并绑定这个KV命名空间
+  // 根据Cloudflare控制台截图，这里使用实际的绑定名称
+  const KV_NAMESPACE = env.LIBRETV_KV; // Cloudflare Pages中配置的KV命名空间绑定名称
   
   // 获取用户ID
   const userId = url.searchParams.get('userId');
