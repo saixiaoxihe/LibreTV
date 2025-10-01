@@ -399,6 +399,29 @@ function initUserSync() {
         });
     }
     
+    // 添加上传数据按钮事件
+    const uploadDataButton = document.getElementById('uploadDataButton');
+    
+    if (uploadDataButton) {
+        uploadDataButton.addEventListener('click', function(event) {
+            window._lastEvent = event;
+            const result = syncDataToCloud();
+            if (result) {
+                showToast('正在上传数据...', 'info');
+            }
+        });
+    }
+    
+    // 添加拉取数据按钮事件
+    const pullDataButton = document.getElementById('pullDataButton');
+    
+    if (pullDataButton) {
+        pullDataButton.addEventListener('click', function(event) {
+            window._lastEvent = event;
+            loadSyncedData();
+        });
+    }
+    
     // 监听libreTvSyncCompleted事件，更新UI
     document.addEventListener('libreTvSyncCompleted', function(event) {
         console.log('[同步] 接收到同步完成事件，更新UI');
@@ -406,13 +429,7 @@ function initUserSync() {
         // 这里可以添加其他UI更新逻辑
     });
     
-    // 页面加载时自动加载同步数据，确保用户在不同设备上能立即看到数据
-    setTimeout(function() {
-        loadSyncedData();
-    }, 1000); // 延迟1秒执行，确保页面其他元素加载完成
-    
-    // 启用每三分钟自动同步
-    enableAutoSync();
+    // 页面加载时不自动加载同步数据，用户需要手动点击拉取数据按钮
 }
 
 // 启用每三分钟自动同步
@@ -449,26 +466,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // 重写相关的数据存储函数以支持用户ID
 // 由于我们不能直接修改其他文件的函数，我们将提供一个钩子函数来增强这些功能
 function enhanceDataStorageFunctions() {
-    // 在数据发生变化时自动同步（如果启用了自动同步）
-    const autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
-    if (autoSyncEnabled) {
-        // 防抖标志，避免短时间内多次触发
-        let syncTimeout = null;
-        
-        // 监听localStorage变化
-        window.addEventListener('storage', function(e) {
-            // 避免循环触发：不处理自己写入的数据变化
-            if (e.key && e.key !== USER_ID_KEY && !e.key.startsWith(SYNCED_DATA_KEY)) {
-                // 清除之前的定时器
-                if (syncTimeout) {
-                    clearTimeout(syncTimeout);
-                }
-                
-                // 延迟同步，避免频繁同步
-                syncTimeout = setTimeout(syncDataToCloud, 5000);
-            }
-        });
-    }
+    // 手动同步模式下，不自动同步数据
+    console.log('[同步] 当前为手动同步模式，数据变化时不会自动同步');
 }
 
 // 导出必要的函数供其他脚本使用
