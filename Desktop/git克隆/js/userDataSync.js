@@ -2,12 +2,12 @@
 // 用户数据同步模块
 
 // 生成六位数纯数字用户ID
-export function generateUserId() {
+function generateUserId() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // 获取当前用户ID
-export function getCurrentUserId() {
+function getCurrentUserId() {
     let userId = localStorage.getItem('userId');
     if (!userId) {
         userId = generateUserId();
@@ -17,7 +17,7 @@ export function getCurrentUserId() {
 }
 
 // 设置用户ID并同步数据
-export async function setUserId(newUserId) {
+async function setUserId(newUserId) {
     // 验证ID格式（六位数纯数字）
     if (!/^\d{6}$/.test(newUserId)) {
         showToast('请输入六位数纯数字ID', 'error');
@@ -91,7 +91,7 @@ async function syncDataFromCloud() {
 }
 
 // 保存历史记录到云端
-export async function syncHistoryToCloud() {
+async function syncHistoryToCloud() {
     try {
         const userId = getCurrentUserId();
         const viewingHistory = JSON.parse(localStorage.getItem('viewingHistory') || '[]');
@@ -119,7 +119,7 @@ export async function syncHistoryToCloud() {
 }
 
 // 保存播放进度到云端
-export async function syncProgressToCloud(videoId, progressData) {
+async function syncProgressToCloud(videoId, progressData) {
     try {
         const userId = getCurrentUserId();
         const key = `progress_${videoId}`;
@@ -193,7 +193,7 @@ function setupAutoSync() {
 }
 
 // 初始化用户数据同步功能
-export function initUserDataSync() {
+function initUserDataSync() {
     // 确保用户有ID
     getCurrentUserId();
     

@@ -114,7 +114,7 @@ function initAPICheckboxes() {
     checkAdultAPIsSelected();
 }
 
-// 添加成人API列表
+// 设置成人API列表
 function addAdultAPI() {
     // 仅在隐藏设置为false时添加成人API组
     if (!HIDE_BUILTIN_ADULT_APIS && (localStorage.getItem('yellowFilterEnabled') === 'false')) {
@@ -159,6 +159,26 @@ function addAdultAPI() {
         });
         container.appendChild(adultdiv);
     }
+}
+
+// 用户ID保存功能
+window.saveUserId = function() {
+    const userIdInput = document.getElementById('userIdInput');
+    const newUserId = userIdInput.value.trim();
+    
+    if (!newUserId) {
+        showToast('请输入六位数ID', 'error');
+        return;
+    }
+    
+    // 调用setUserId函数来设置新的用户ID并同步数据
+    setUserId(newUserId).then(success => {
+        if (success) {
+            // 更新UI显示
+            document.getElementById('currentUserId').textContent = newUserId;
+            userIdInput.value = '';
+        }
+    });
 }
 
 // 检查是否有成人API被选中
