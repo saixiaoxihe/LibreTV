@@ -1,9 +1,8 @@
-import * as path from 'path';
+import path from 'path';
 import express from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import * as pathModule from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -11,7 +10,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = pathModule.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 const config = {
   port: process.env.PORT || 8080,
@@ -73,10 +72,10 @@ app.get(['/', '/index.html', '/player.html'], async (req, res) => {
     let filePath;
     switch (req.path) {
       case '/player.html':
-        filePath = pathModule.join(__dirname, 'player.html');
+        filePath = path.join(__dirname, 'player.html');
         break;
       default: // '/' 和 '/index.html'
-        filePath = pathModule.join(__dirname, 'index.html');
+        filePath = path.join(__dirname, 'index.html');
         break;
     }
     
@@ -90,7 +89,7 @@ app.get(['/', '/index.html', '/player.html'], async (req, res) => {
 
 app.get('/s=:keyword', async (req, res) => {
   try {
-    const filePath = pathModule.join(__dirname, 'index.html');
+    const filePath = path.join(__dirname, 'index.html');
     const content = await renderPage(filePath, config.password);
     res.send(content);
   } catch (error) {
@@ -193,7 +192,7 @@ app.get('/proxy/:encodedUrl', async (req, res) => {
   }
 });
 
-app.use(express.static(pathModule.join(__dirname), {
+app.use(express.static(path.join(__dirname), {
   maxAge: config.cacheMaxAge
 }));
 

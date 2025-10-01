@@ -56,6 +56,15 @@ function goBack(event) {
 
 // 页面加载时保存当前URL到localStorage，作为返回目标
 window.addEventListener('load', function () {
+    // 引入用户数据同步脚本
+    const userDataSyncScript = document.createElement('script');
+    userDataSyncScript.src = 'js/userDataSync.js';
+    userDataSyncScript.onload = function() {
+        // 初始化用户数据同步
+        initUserDataSync();
+    };
+    document.head.appendChild(userDataSyncScript);
+
     // 保存前一页面URL
     if (document.referrer && document.referrer !== window.location.href) {
         localStorage.setItem('lastPageUrl', document.referrer);
@@ -252,47 +261,26 @@ function initializePageContent() {
     document.addEventListener('keydown', handleKeyboardShortcuts);
 
     // 添加页面离开事件监听，保存播放位置
-    window.addEventListener('beforeunload', async (e) => {
-        try {
-            await saveCurrentProgress();
-        } catch (error) {
-            console.error('页面离开时保存进度失败:', error);
-            // 在beforeunload事件中，我们不能阻止页面关闭，所以只是记录错误
-        }
-    });
+    window.addEventListener('beforeunload', saveCurrentProgress);
 
     // 新增：页面隐藏（切后台/切标签）时也保存
-    document.addEventListener('visibilitychange', async function () {
+    document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
-            try {
-                await saveCurrentProgress();
-            } catch (error) {
-                console.error('页面隐藏时保存进度失败:', error);
-            }
+            saveCurrentProgress();
         }
     });
 
     // 视频暂停时也保存
     const waitForVideo = setInterval(() => {
         if (art && art.video) {
-            art.video.addEventListener('pause', async function() {
-                try {
-                    await saveCurrentProgress();
-                } catch (error) {
-                    console.error('视频暂停时保存进度失败:', error);
-                }
-            });
+            art.video.addEventListener('pause', saveCurrentProgress);
 
             // 新增：播放进度变化时节流保存
             let lastSave = 0;
-            art.video.addEventListener('timeupdate', async function() {
+            art.video.addEventListener('timeupdate', function() {
                 const now = Date.now();
                 if (now - lastSave > 5000) { // 每5秒最多保存一次
-                    try {
-                        await saveCurrentProgress();
-                    } catch (error) {
-                        console.error('进度变化时保存进度失败:', error);
-                    }
+                    saveCurrentProgress();
                     lastSave = now;
                 }
             });
@@ -421,11 +409,6 @@ function showShortcutHint(text, direction) {
 function initPlayer(videoUrl) {
     if (!videoUrl) {
         return
-    }
-
-    // 初始化数据同步系统
-    if (typeof dataSync !== 'undefined' && typeof dataSync.initDataSync === 'function') {
-        dataSync.initDataSync();
     }
 
     // 销毁旧实例
@@ -711,13 +694,7 @@ function initPlayer(videoUrl) {
         setupProgressBarPreciseClicks();
 
         // 视频加载成功后，在稍微延迟后将其添加到观看历史
-        setTimeout(async () => {
-            try {
-                await saveToHistory();
-            } catch (error) {
-                console.error('保存历史记录失败:', error);
-            }
-        }, 3000);
+        setTimeout(saveToHistory, 3000);
 
         // 启动定期保存播放进度
         startProgressSaveInterval();
@@ -743,14 +720,10 @@ function initPlayer(videoUrl) {
     setupLongPressSpeedControl();
 
     // 视频播放结束事件
-    art.on('video:ended', async function () {
+    art.on('video:ended', function () {
         videoHasEnded = true;
 
-        try {
-            await clearVideoProgress();
-        } catch (error) {
-            console.error('清除进度记录失败:', error);
-        }
+        clearVideoProgress();
 
         // 如果自动播放下一集开启，且确实有下一集
         if (autoplayEnabled && currentEpisodeIndex < currentEpisodes.length - 1) {
@@ -983,13 +956,7 @@ function playEpisode(index) {
     userClickedPosition = null;
 
     // 三秒后保存到历史记录
-    setTimeout(async () => {
-        try {
-            await saveToHistory();
-        } catch (error) {
-            console.error('保存历史记录失败:', error);
-        }
-    }, 3000);
+    setTimeout(() => saveToHistory(), 3000);
 }
 
 // 播放上一集
@@ -1115,7 +1082,7 @@ function setupProgressBarPreciseClicks() {
 }
 
 // 在播放器初始化后添加视频到历史记录
-async function saveToHistory() {
+function saveToHistory() {
     // 确保 currentEpisodes 非空且有当前视频URL
     if (!currentEpisodes || currentEpisodes.length === 0 || !currentVideoUrl) {
         return;
@@ -1161,7 +1128,7 @@ async function saveToHistory() {
     };
     
     try {
-        const history = await dataSync.getData('viewingHistory') || [];
+        const history = JSON.parse(localStorage.getItem('viewingHistory') || '[]');
 
         // 检查是否已经存在相同的系列记录 (基于标题、来源和 showIdentifier)
         const existingIndex = history.findIndex(item => 
@@ -1208,7 +1175,12 @@ async function saveToHistory() {
         // 限制历史记录数量为50条
         if (history.length > 50) history.splice(50);
 
-        await dataSync.saveData('viewingHistory', history);
+        localStorage.setItem('viewingHistory', JSON.stringify(history));
+        
+        // 如果用户已登录，同步数据到云端
+        if (typeof syncHistoryToCloud === 'function') {
+            syncHistoryToCloud();
+        }
     } catch (e) {
         console.error('保存历史记录失败:', e);
     }
@@ -1265,17 +1237,11 @@ function startProgressSaveInterval() {
     }
 
     // 每30秒保存一次播放进度
-    progressSaveInterval = setInterval(async () => {
-        try {
-            await saveCurrentProgress();
-        } catch (error) {
-            console.error('定期保存进度失败:', error);
-        }
-    }, 30000);
+    progressSaveInterval = setInterval(saveCurrentProgress, 30000);
 }
 
 // 保存当前播放进度
-async function saveCurrentProgress() {
+function saveCurrentProgress() {
     if (!art || !art.video) return;
     const currentTime = art.video.currentTime;
     const duration = art.video.duration;
@@ -1292,29 +1258,37 @@ async function saveCurrentProgress() {
         localStorage.setItem(progressKey, JSON.stringify(progressData));
         // --- 新增：同步更新 viewingHistory 中的进度 ---
         try {
-            const history = await dataSync.getData('viewingHistory') || [];
-            // 用 title + 集数索引唯一标识
-            const idx = history.findIndex(item =>
-                item.title === currentVideoTitle &&
-                (item.episodeIndex === undefined || item.episodeIndex === currentEpisodeIndex)
-            );
-            if (idx !== -1) {
-                // 只在进度有明显变化时才更新，减少写入
-                if (
-                    Math.abs((history[idx].playbackPosition || 0) - currentTime) > 2 ||
-                    Math.abs((history[idx].duration || 0) - duration) > 2
-                ) {
-                    history[idx].playbackPosition = currentTime;
-                    history[idx].duration = duration;
-                    history[idx].timestamp = Date.now();
-                    await dataSync.saveData('viewingHistory', history);
+            const historyRaw = localStorage.getItem('viewingHistory');
+            if (historyRaw) {
+                const history = JSON.parse(historyRaw);
+                // 用 title + 集数索引唯一标识
+                const idx = history.findIndex(item =>
+                    item.title === currentVideoTitle &&
+                    (item.episodeIndex === undefined || item.episodeIndex === currentEpisodeIndex)
+                );
+                if (idx !== -1) {
+                    // 只在进度有明显变化时才更新，减少写入
+                    if (
+                        Math.abs((history[idx].playbackPosition || 0) - currentTime) > 2 ||
+                        Math.abs((history[idx].duration || 0) - duration) > 2
+                    ) {
+                        history[idx].playbackPosition = currentTime;
+                        history[idx].duration = duration;
+                        history[idx].timestamp = Date.now();
+                        localStorage.setItem('viewingHistory', JSON.stringify(history));
+                    }
                 }
             }
         } catch (e) {
             console.error('更新历史记录进度失败:', e);
         }
+        
+        // 如果用户已登录，同步数据到云端
+        if (typeof syncProgressToCloud === 'function') {
+            syncProgressToCloud(getVideoId(), progressData);
+        }
     } catch (e) {
-        console.error('保存进度失败:', e);
+        console.error('保存播放进度失败:', e);
     }
 }
 
@@ -1434,34 +1408,17 @@ function setupLongPressSpeedControl() {
 }
 
 // 清除视频进度记录
-async function clearVideoProgress() {
+function clearVideoProgress() {
     const progressKey = `videoProgress_${getVideoId()}`;
     try {
-        // 清除本地存储
         localStorage.removeItem(progressKey);
         
-        // 同时清除云端同步的进度记录
-        await dataSync.clearData(progressKey);
-        
-        // 同时从观看历史中移除当前视频的进度记录
-        const historyKey = 'viewingHistory';
-        try {
-            const viewingHistory = await dataSync.getData(historyKey);
-            if (viewingHistory && Array.isArray(viewingHistory)) {
-                const videoId = getVideoId();
-                const updatedHistory = viewingHistory.map(item => {
-                    if (item.videoId === videoId) {
-                        return { ...item, progress: 0 };
-                    }
-                    return item;
-                });
-                await dataSync.saveData(historyKey, updatedHistory);
-            }
-        } catch (error) {
-            console.error('更新观看历史失败:', error);
+        // 如果用户已登录，同步数据到云端
+        if (typeof syncProgressToCloud === 'function') {
+            syncProgressToCloud(getVideoId(), null); // null表示清除
         }
     } catch (e) {
-        console.error('清除视频进度失败:', e);
+        console.error('清除播放进度失败:', e);
     }
 }
 

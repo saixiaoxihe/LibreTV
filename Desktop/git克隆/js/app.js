@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // 渲染搜索历史
     renderSearchHistory();
 
+    // 初始化用户数据同步功能
+    initUserDataSync();
+    
+    // 显示当前用户ID
+    document.getElementById('currentUserId').textContent = getCurrentUserId();
+
     // 设置默认API选择（如果是第一次加载）
     if (!localStorage.getItem('hasInitializedDefaults')) {
         // 默认选中资源
@@ -47,14 +53,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (yellowFilterToggle) {
         yellowFilterToggle.checked = localStorage.getItem('yellowFilterEnabled') === 'true';
     }
-
-    // 在页面加载完成后立即加载用户ID
-    loadUserId();
-    
-    // 在窗口完全加载后再次尝试加载用户ID，确保所有元素都已渲染
-    window.addEventListener('load', function() {
-        setTimeout(loadUserId, 500);
-    });
 
     // 设置广告过滤开关初始状态
     const adFilterToggle = document.getElementById('adFilterToggle');
@@ -486,6 +484,33 @@ function removeCustomApi(index) {
     checkAdultAPIsSelected();
 
     showToast('已移除自定义API: ' + apiName, 'info');
+}
+
+// 保存用户ID
+function saveUserId() {
+    const userIdInput = document.getElementById('userIdInput');
+    const userId = userIdInput.value.trim();
+    
+    if (!userId) {
+        // 如果用户没有输入ID，生成一个新的ID
+        const newUserId = generateUserId();
+        setUserId(newUserId).then(success => {
+            if (success) {
+                document.getElementById('currentUserId').textContent = newUserId;
+                userIdInput.value = '';
+                showToast('已生成新的用户ID', 'success');
+            }
+        });
+        return;
+    }
+    
+    // 验证并设置用户ID
+    setUserId(userId).then(success => {
+        if (success) {
+            document.getElementById('currentUserId').textContent = userId;
+            userIdInput.value = '';
+        }
+    });
 }
 
 function toggleSettings(e) {
@@ -1364,71 +1389,3 @@ function saveStringAsFile(content, fileName) {
 }
 
 // 移除Node.js的require语句，因为这是在浏览器环境中运行的
-
-// 加载当前用户ID到设置面板
-function loadUserId() {
-    if (typeof dataSync !== 'undefined' && dataSync.getUserId) {
-        const userId = dataSync.getUserId();
-        const userIdInput = document.getElementById('currentUserId');
-        if (userIdInput) {
-            userIdInput.value = userId;
-        }
-    }
-}
-
-// 复制用户ID到剪贴板
-function copyUserId() {
-    if (typeof dataSync !== 'undefined' && dataSync.exportUserId) {
-        const userId = dataSync.exportUserId();
-        navigator.clipboard.writeText(userId).then(() => {
-            // 显示复制成功提示
-            const btn = event.target.closest('button');
-            const originalText = btn.textContent;
-            btn.textContent = '已复制！';
-            btn.classList.add('bg-green-600');
-            
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.classList.remove('bg-green-600');
-            }, 2000);
-        }).catch(err => {
-            console.error('无法复制用户ID:', err);
-            alert('复制失败，请手动复制用户ID');
-        });
-    }
-}
-
-// 导入用户ID
-function importUserId() {
-    if (typeof dataSync !== 'undefined' && dataSync.importUserId) {
-        const userIdInput = document.getElementById('importUserIdInput');
-        const userId = userIdInput.value.trim();
-        
-        if (userId) {
-            const success = dataSync.importUserId(userId);
-            if (success) {
-                // 更新显示的用户ID
-                loadUserId();
-                userIdInput.value = '';
-                
-                // 显示导入成功提示
-                alert('用户ID导入成功！\n观看记录将从云端同步。');
-            } else {
-                alert('用户ID格式不正确，请重新输入。');
-            }
-        } else {
-            alert('请输入有效的用户ID。');
-        }
-    }
-}
-
-// 在设置面板显示时加载用户ID
-const originalToggleSettings = toggleSettings;
-toggleSettings = function(e) {
-    originalToggleSettings(e);
-    
-    // 延迟加载用户ID，确保设置面板已经显示
-    setTimeout(() => {
-        loadUserId();
-    }, 100);
-};
