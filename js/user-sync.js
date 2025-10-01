@@ -331,10 +331,30 @@ function loadFromLocalStorageBackup(userId) {
                 
                 // 更新同步UI状态（标记为本地同步）
                 updateSyncUI(true, true);
+                
+                // 只在用户主动点击操作时显示提示
+                const event = window._lastEvent;
+                if (event && event.type === 'click') {
+                    showToast('已从本地备份加载数据', 'success');
+                }
+            }
+        } else {
+            console.log(`[同步] 用户ID: ${userId}，本地暂无备份数据`);
+            
+            // 只在用户主动点击操作时显示提示
+            const event = window._lastEvent;
+            if (event && event.type === 'click') {
+                showToast('暂无备份数据', 'info');
             }
         }
     } catch (error) {
         console.error('[同步] 从localStorage备份加载数据失败:', error);
+        
+        // 只在用户主动点击操作时显示提示
+        const event = window._lastEvent;
+        if (event && event.type === 'click') {
+            showToast('加载本地备份失败', 'error');
+        }
     }
 }
 
@@ -403,10 +423,8 @@ function initUserSync() {
     if (uploadDataButton) {
         uploadDataButton.addEventListener('click', function(event) {
             window._lastEvent = event;
-            const result = syncDataToCloud();
-            if (result) {
-                showToast('正在上传数据...', 'info');
-            }
+            showToast('正在上传数据...', 'info');
+            syncDataToCloud();
         });
     }
     
@@ -416,6 +434,7 @@ function initUserSync() {
     if (pullDataButton) {
         pullDataButton.addEventListener('click', function(event) {
             window._lastEvent = event;
+            showToast('正在拉取数据...', 'info');
             loadSyncedData();
         });
     }
