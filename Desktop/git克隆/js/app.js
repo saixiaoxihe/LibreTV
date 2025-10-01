@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', function () {
         yellowFilterToggle.checked = localStorage.getItem('yellowFilterEnabled') === 'true';
     }
 
+    // 在页面加载完成后立即加载用户ID
+    loadUserId();
+
     // 设置广告过滤开关初始状态
     const adFilterToggle = document.getElementById('adFilterToggle');
     if (adFilterToggle) {
