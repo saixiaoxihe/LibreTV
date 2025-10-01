@@ -34,6 +34,19 @@ function setUserId(newUserId) {
     return true;
 }
 
+// 检查是否在Cloudflare环境中运行
+function isRunningInCloudflare() {
+    // 检查是否有特定的Cloudflare环境变量或标志
+    // 这个函数会在页面加载时更新
+    if (window.__CF && window.__CF.Cloudflare) {
+        return true;
+    }
+    
+    // 检查URL主机名是否是Cloudflare Pages域名
+    const hostname = window.location.hostname;
+    return hostname.endsWith('.pages.dev') || hostname.endsWith('.workers.dev');
+}
+
 // 获取需要同步的数据
 function getSyncableData() {
     const data = {
@@ -95,7 +108,30 @@ function saveDataToLocal(data) {
     return true;
 }
 
-// 同步数据到云端（模拟）
+// 辅助函数：发送网络请求，带重试机制
+async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000) {
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.warn(`请求失败 (${url}): ${error.message}`);
+        
+        // 如果还有重试次数，延迟后重试
+        if (retries > 0) {
+            console.log(`将在${retryDelay}ms后重试，剩余重试次数: ${retries}`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            return fetchWithRetry(url, options, retries - 1, retryDelay * 2); // 指数退避
+        }
+        
+        // 所有重试都失败
+        throw error;
+    }
+}
+
+// 同步数据到云端（Cloudflare KV）
 // 添加一个锁，防止短时间内重复调用
 let syncingInProgress = false;
 let lastSyncTime = 0;
@@ -117,37 +153,63 @@ function syncDataToCloud() {
     
     syncingInProgress = true;
     
-    try {
-        const userId = getUserId();
-        const data = getSyncableData();
-        
-        // 在实际应用中，这里应该发送API请求到服务器
-        // 但由于这是一个本地项目，我们将数据存储在localStorage中，并在控制台打印信息
-        const syncedDataKey = `${SYNCED_DATA_KEY}_${userId}`;
-        localStorage.setItem(syncedDataKey, JSON.stringify(data));
-        
-        console.log(`[同步] 用户ID: ${userId}，已将数据保存到云端（模拟）`);
-        
-        // 更新同步UI
-        updateSyncUI(true);
-        
-        // 更新最后同步时间
-        lastSyncTime = now;
-        
-        return true;
-    } catch (error) {
-        console.error('[同步] 同步数据到云端失败:', error);
-        showToast('数据同步失败', 'error');
-        return false;
-    } finally {
-        // 无论成功失败，都要释放锁
-        setTimeout(() => {
-            syncingInProgress = false;
-        }, 1000); // 1秒后释放锁，防止过于频繁的调用
+    // 获取用户ID和同步数据
+    const userId = getUserId();
+    const data = getSyncableData();
+    
+    // 判断是否在Cloudflare环境中运行
+    const isCloudflareEnv = isRunningInCloudflare();
+    
+    if (isCloudflareEnv) {
+        // 发送数据到Cloudflare Function
+        fetchWithRetry(`/user-sync?userId=${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(result => {
+            if (result.success) {
+                console.log(`[同步] 用户ID: ${userId}，已将数据保存到Cloudflare KV`);
+                
+                // 更新同步UI
+                updateSyncUI(true);
+                
+                // 更新最后同步时间
+                lastSyncTime = now;
+                localStorage.setItem('lastSyncTime', now.toString());
+            } else {
+                console.error('[同步] 同步数据到云端失败:', result.message);
+                showToast(`数据同步失败: ${result.message}`, 'error');
+                
+                // 降级到localStorage作为备份
+                fallbackToLocalStorage(userId, data);
+            }
+        })
+        .catch(error => {
+            console.error('[同步] 同步数据到云端网络错误:', error);
+            showToast('数据同步失败，请检查网络连接', 'error');
+            
+            // 降级到localStorage作为备份
+            fallbackToLocalStorage(userId, data);
+        })
+        .finally(() => {
+            // 无论成功失败，都要释放锁
+            setTimeout(() => {
+                syncingInProgress = false;
+            }, 1000); // 1秒后释放锁，防止过于频繁的调用
+        });
+    } else {
+        // 非Cloudflare环境，使用localStorage作为备份
+        fallbackToLocalStorage(userId, data);
+        syncingInProgress = false;
     }
+    
+    return true;
 }
 
-// 从云端加载数据（模拟）
+// 从云端加载数据（Cloudflare KV）
 function loadSyncedData() {
     // 检查是否正在同步中
     if (syncingInProgress) {
@@ -157,50 +219,113 @@ function loadSyncedData() {
     }
     
     const userId = getUserId();
-    const syncedDataKey = `${SYNCED_DATA_KEY}_${userId}`;
     
-    // 在实际应用中，这里应该发送API请求到服务器获取数据
-    // 但由于这是一个本地项目，我们从localStorage中读取数据
-    const syncedData = localStorage.getItem(syncedDataKey);
+    // 判断是否在Cloudflare环境中运行
+    const isCloudflareEnv = isRunningInCloudflare();
     
-    if (syncedData) {
-        try {
+    if (isCloudflareEnv) {
+        // 发送请求到Cloudflare Function获取数据
+        fetchWithRetry(`/user-sync?userId=${userId}`)
+        .then(result => {
+            if (result.success && result.data) {
+                try {
+                    if (saveDataToLocal(result.data)) {
+                        console.log(`[同步] 用户ID: ${userId}，已从Cloudflare KV加载数据`);
+                        
+                        // 只在用户主动点击操作时显示提示
+                        const event = window.event || window._lastEvent;
+                        if (event && event.type === 'click') {
+                            showToast('数据同步成功', 'success');
+                        }
+                        
+                        // 不使用location.reload()，而是触发自定义事件让其他组件更新
+                        const syncEvent = new CustomEvent('libreTvSyncCompleted', { detail: result.data });
+                        document.dispatchEvent(syncEvent);
+                        
+                        // 更新同步UI状态
+                        updateSyncUI(true);
+                    }
+                } catch (e) {
+                    console.error('保存同步数据失败:', e);
+                    showToast('数据保存失败', 'error');
+                }
+            } else {
+                console.log(`[同步] 用户ID: ${userId}，云端暂无同步数据`);
+                
+                // 尝试从localStorage备份加载数据
+                loadFromLocalStorageBackup(userId);
+                
+                // 只在用户主动点击操作时显示提示
+                const event = window.event || window._lastEvent;
+                if (event && event.type === 'click') {
+                    showToast('当前用户无同步数据', 'info');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('[同步] 从云端加载数据失败:', error);
+            // 尝试从localStorage备份加载数据
+            loadFromLocalStorageBackup(userId);
+            
+            // 避免在页面自动加载时显示错误提示
+            const event = window.event || window._lastEvent;
+            if (event && event.type === 'click') {
+                showToast('数据加载失败，请检查网络连接', 'error');
+            }
+        });
+    } else {
+        // 非Cloudflare环境，尝试从localStorage备份加载数据
+        loadFromLocalStorageBackup(userId);
+    }
+    
+    return true;
+}
+
+// 降级到localStorage作为备份
+function fallbackToLocalStorage(userId, data) {
+    try {
+        const syncedDataKey = `${SYNCED_DATA_KEY}_${userId}`;
+        localStorage.setItem(syncedDataKey, JSON.stringify(data));
+        console.log(`[同步] 用户ID: ${userId}，已将数据保存到localStorage作为备份`);
+        
+        // 更新同步UI（标记为本地同步）
+        updateSyncUI(true, true);
+        
+        // 更新最后同步时间
+        const now = Date.now();
+        lastSyncTime = now;
+        localStorage.setItem('lastSyncTime', now.toString());
+    } catch (error) {
+        console.error('[同步] 保存到localStorage备份失败:', error);
+    }
+}
+
+// 从localStorage备份加载数据
+function loadFromLocalStorageBackup(userId) {
+    try {
+        const syncedDataKey = `${SYNCED_DATA_KEY}_${userId}`;
+        const syncedData = localStorage.getItem(syncedDataKey);
+        
+        if (syncedData) {
             const data = JSON.parse(syncedData);
             if (saveDataToLocal(data)) {
-                console.log(`[同步] 用户ID: ${userId}，已从云端加载数据（模拟）`);
+                console.log(`[同步] 用户ID: ${userId}，已从localStorage备份加载数据`);
                 
-                // 优化：减少提示频率，只在用户主动点击加载按钮时显示
-                const event = window.event || window._lastEvent;
-                if (event && event.type === 'click' && event.target.closest('#loadSyncedDataButton')) {
-                    showToast('数据同步成功', 'success');
-                }
-                
-                // 优化：不使用location.reload()，而是触发自定义事件让其他组件更新
+                // 触发自定义事件让其他组件更新
                 const syncEvent = new CustomEvent('libreTvSyncCompleted', { detail: data });
                 document.dispatchEvent(syncEvent);
                 
-                // 更新同步UI状态
-                updateSyncUI(true);
-                
-                return true;
+                // 更新同步UI状态（标记为本地同步）
+                updateSyncUI(true, true);
             }
-        } catch (e) {
-            console.error('解析同步数据失败:', e);
-            showToast('数据解析失败', 'error');
         }
+    } catch (error) {
+        console.error('[同步] 从localStorage备份加载数据失败:', error);
     }
-    
-    // 只在用户主动点击加载按钮时显示提示
-    const event = window.event || window._lastEvent;
-    if (event && event.type === 'click' && event.target.closest('#loadSyncedDataButton')) {
-        showToast('当前用户无同步数据', 'info');
-    }
-    
-    return false;
 }
 
 // 更新同步UI状态
-function updateSyncUI(isSynced = false) {
+function updateSyncUI(isSynced = false, isLocalSync = false) {
     const lastSyncTimeElement = document.getElementById('lastSyncTime');
     const syncStatusElement = document.getElementById('syncStatus');
     
@@ -216,7 +341,11 @@ function updateSyncUI(isSynced = false) {
     
     if (syncStatusElement) {
         if (isSynced) {
-            syncStatusElement.innerHTML = '<span class="text-green-500">●</span> 已同步';
+            if (isLocalSync) {
+                syncStatusElement.innerHTML = '<span class="text-green-500">●</span> 已同步 (本地备份)';
+            } else {
+                syncStatusElement.innerHTML = '<span class="text-green-500">●</span> 已同步';
+            }
         } else {
             syncStatusElement.innerHTML = '<span class="text-yellow-500">●</span> 未同步';
         }
@@ -241,26 +370,8 @@ function initUserSync() {
     // 更新同步状态
     updateSyncUI();
     
-    // 添加同步按钮事件
-    const syncButton = document.getElementById('syncDataButton');
-    const loadButton = document.getElementById('loadSyncedDataButton');
+    // 添加用户ID应用按钮事件
     const applyIdButton = document.getElementById('applyUserIdButton');
-    
-    if (syncButton) {
-        syncButton.addEventListener('click', function(event) {
-            // 记录最后一个事件，用于判断是否是用户主动操作
-            window._lastEvent = event;
-            syncDataToCloud();
-        });
-    }
-    
-    if (loadButton) {
-        loadButton.addEventListener('click', function(event) {
-            // 记录最后一个事件，用于判断是否是用户主动操作
-            window._lastEvent = event;
-            loadSyncedData();
-        });
-    }
     
     if (applyIdButton) {
         applyIdButton.addEventListener('click', function(event) {
@@ -277,6 +388,39 @@ function initUserSync() {
         console.log('[同步] 接收到同步完成事件，更新UI');
         updateSyncUI(true);
         // 这里可以添加其他UI更新逻辑
+    });
+    
+    // 页面加载时自动加载同步数据，确保用户在不同设备上能立即看到数据
+    setTimeout(function() {
+        loadSyncedData();
+    }, 1000); // 延迟1秒执行，确保页面其他元素加载完成
+    
+    // 启用每三分钟自动同步
+    enableAutoSync();
+}
+
+// 启用每三分钟自动同步
+function enableAutoSync() {
+    // 立即执行一次同步
+    syncDataToCloud();
+    
+    // 然后每三分钟执行一次同步
+    setInterval(function() {
+        // 只在页面可见时执行同步，节省资源
+        if (document.visibilityState === 'visible') {
+            syncDataToCloud();
+        }
+    }, 3 * 60 * 1000); // 3分钟
+    
+    // 监听页面可见性变化，当页面从不可见变为可见时同步一次
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            // 检查距离上次同步是否超过1分钟，如果是则同步
+            const now = Date.now();
+            if (now - lastSyncTime > 60000) {
+                syncDataToCloud();
+            }
+        }
     });
 }
 
