@@ -63,6 +63,7 @@ function getSyncableData() {
         yellowFilterEnabled: false,
         adFilterEnabled: false,
         doubanEnabled: false,
+        searchHistory: [],
         lastSyncTime: Date.now()
     };
     
@@ -79,6 +80,9 @@ function getSyncableData() {
         data.yellowFilterEnabled = localStorage.getItem('yellowFilterEnabled') === 'true';
         data.adFilterEnabled = localStorage.getItem(PLAYER_CONFIG.adFilteringStorage) !== 'false';
         data.doubanEnabled = localStorage.getItem('doubanEnabled') === 'true';
+        
+        // 同步搜索历史
+        data.searchHistory = JSON.parse(localStorage.getItem('videoSearchHistory') || '[]');
     } catch (e) {
         console.error('获取同步数据失败:', e);
     }
@@ -104,6 +108,11 @@ function saveDataToLocal(data) {
         localStorage.setItem('yellowFilterEnabled', data.yellowFilterEnabled ? 'true' : 'false');
         localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, data.adFilterEnabled ? 'true' : 'false');
         localStorage.setItem('doubanEnabled', data.doubanEnabled ? 'true' : 'false');
+        
+        // 保存搜索历史
+        if (data.searchHistory && Array.isArray(data.searchHistory)) {
+            localStorage.setItem('videoSearchHistory', JSON.stringify(data.searchHistory));
+        }
         
         // 保存同步时间
         localStorage.setItem('lastSyncTime', Date.now().toString());
