@@ -129,6 +129,80 @@ app.use('/proxy', (req, res, next) => {
   next();
 });
 
+// 模拟Cloudflare Functions的user-sync路由
+app.all('/user-sync', async (req, res) => {
+  try {
+    // 设置CORS头
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Content-Type', 'application/json');
+    
+    // 处理OPTIONS请求（CORS预检）
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // 获取用户ID
+    const userId = req.query.userId;
+    
+    // 验证用户ID
+    if (!userId || !/^\d{6}$/.test(userId)) {
+      return res.status(400).json({ success: false, message: '无效的用户ID' });
+    }
+    
+    // 构建KV键名（在本地使用localStorage模拟）
+    const kvKey = `libreTvSyncedData_${userId}`;
+    
+    // 创建一个简单的内存存储来模拟KV
+    if (!global.userSyncStorage) {
+      global.userSyncStorage = {};
+    }
+    
+    if (req.method === 'GET') {
+      // 加载数据
+      const data = global.userSyncStorage[kvKey];
+      
+      if (data) {
+        return res.json({ success: true, data: JSON.parse(data) });
+      } else {
+        return res.status(404).json({ success: false, message: '未找到同步数据' });
+      }
+    } else if (req.method === 'POST') {
+      // 保存数据
+      let data = req.body;
+      
+      // 如果不是JSON格式，尝试解析
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (e) {
+          return res.status(400).json({ success: false, message: '无效的JSON格式' });
+        }
+      }
+      
+      // 验证数据格式
+      if (!data || typeof data !== 'object') {
+        return res.status(400).json({ success: false, message: '无效的数据格式' });
+      }
+      
+      // 添加时间戳
+      data.lastSyncTime = Date.now();
+      
+      // 保存到内存存储
+      global.userSyncStorage[kvKey] = JSON.stringify(data);
+      
+      console.log(`[本地模拟KV] 用户ID: ${userId}，已存储同步数据`);
+      return res.json({ success: true, message: '数据同步成功' });
+    } else {
+      return res.status(405).json({ success: false, message: '不支持的请求方法' });
+    }
+  } catch (error) {
+    console.error('处理user-sync请求失败:', error);
+    return res.status(500).json({ success: false, message: '服务器内部错误' });
+  }
+});
+
 // 代理路由
 app.get('/proxy/:encodedUrl', async (req, res) => {
   try {
