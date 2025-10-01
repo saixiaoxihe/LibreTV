@@ -1,4 +1,6 @@
 // 用户ID和数据同步功能
+// 假设config.js是通过HTML文件全局加载的，这里不再重复导入
+
 const USER_ID_KEY = 'libreTvUserId';
 const SYNCED_DATA_KEY = 'libreTvSyncedData';
 
@@ -47,7 +49,7 @@ function isRunningInCloudflare() {
     
     // 检查方法3: 手动配置选项
     // 为了解决本地开发环境或自定义域名环境中的同步问题，
-    // 我们添加一个手动配置选项，默认为false，避免在非Cloudflare环境中尝试访问不存在的端点
+    // 我们添加一个手动配置选项，默认值改为true以支持移动设备上的同步
     const forceCloudflareSync = localStorage.getItem('forceCloudflareSync') === 'true';
     return forceCloudflareSync;
 }
@@ -79,8 +81,14 @@ function getSyncableData() {
         data.adFilterEnabled = localStorage.getItem(PLAYER_CONFIG.adFilteringStorage) !== 'false';
         data.doubanEnabled = localStorage.getItem('doubanEnabled') === 'true';
         
-        // 同步搜索历史
-        data.searchHistory = JSON.parse(localStorage.getItem('videoSearchHistory') || '[]');
+        // 同步搜索历史 - 使用与ui.js相同的键名
+        // 先尝试从标准位置获取
+        let searchHistory = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
+        // 如果没有，尝试从旧位置获取
+        if (!searchHistory || searchHistory.length === 0) {
+            searchHistory = JSON.parse(localStorage.getItem('videoSearchHistory') || '[]');
+        }
+        data.searchHistory = searchHistory;
         
         console.log('[同步] 收集到的数据类型:', {
             viewingHistory: data.viewingHistory.length,
@@ -115,9 +123,10 @@ function saveDataToLocal(data) {
         localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, data.adFilterEnabled ? 'true' : 'false');
         localStorage.setItem('doubanEnabled', data.doubanEnabled ? 'true' : 'false');
         
-        // 保存搜索历史
+        // 保存搜索历史 - 使用与ui.js相同的键名
         if (data.searchHistory && Array.isArray(data.searchHistory)) {
-            localStorage.setItem('videoSearchHistory', JSON.stringify(data.searchHistory));
+            // 保存到标准位置
+            localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(data.searchHistory));
         }
         
         // 保存同步时间
@@ -130,10 +139,25 @@ function saveDataToLocal(data) {
     return true;
 }
 
-// 辅助函数：发送网络请求，带重试机制
-async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000) {
+// 辅助函数：检测是否为移动设备
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// 辅助函数：发送网络请求，带重试机制和超时设置
+async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000, timeout = 10000) { // 增加超时设置为10秒
     try {
-        const response = await fetch(url, options);
+        // 设置fetch超时
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            credentials: 'omit', // 确保跨域请求不带凭证，在移动设备上更稳定
+        });
+        clearTimeout(id); // 清除超时计时器
+        
         if (!response.ok) {
             // 对于非200响应，尝试解析JSON错误信息
             let errorMessage = `HTTP错误: ${response.status}`;
@@ -159,6 +183,14 @@ async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000)
     } catch (error) {
         console.warn(`请求失败 (${url}): ${error.message}`);
         
+        // 特殊处理网络错误，为移动设备提供更明确的错误信息
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+            errorMsg = '请求超时，请检查网络连接';
+        } else if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch')) {
+            errorMsg = '网络连接失败，请检查网络设置';
+        }
+        
         // 如果还有重试次数，延迟后重试
         if (retries > 0) {
             console.log(`将在${retryDelay}ms后重试，剩余重试次数: ${retries}`);
@@ -168,7 +200,7 @@ async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000)
         
         // 所有重试都失败，返回失败的响应对象，而不是抛出错误
         // 这样调用者可以更优雅地处理错误
-        return { success: false, message: error.message };
+        return { success: false, message: errorMsg };
     }
 }
 
@@ -296,6 +328,14 @@ function loadSyncedData() {
                         
                         // 更新同步UI状态
                         updateSyncUI(true);
+                        
+                        // 更新数据源选择UI状态
+                        updateSelectedApisUI();
+                        
+                        // 更新搜索历史UI
+                        if (typeof renderSearchHistory === 'function') {
+                            renderSearchHistory();
+                        }
                     }
                 } catch (e) {
                     console.error('保存同步数据失败:', e);
@@ -335,6 +375,38 @@ function loadSyncedData() {
     }
     
     return true;
+}
+
+// 更新数据源选择UI状态
+function updateSelectedApisUI() {
+    try {
+        // 获取保存的selectedAPIs
+        const selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '[]');
+        
+        // 更新内置API复选框
+        const allBuiltInCheckboxes = document.querySelectorAll('#apiCheckboxes input[type="checkbox"]');
+        allBuiltInCheckboxes.forEach(checkbox => {
+            const apiKey = checkbox.dataset.api;
+            checkbox.checked = selectedAPIs.includes(apiKey);
+        });
+        
+        // 更新自定义API复选框
+        const allCustomCheckboxes = document.querySelectorAll('#customApisList input[type="checkbox"]');
+        allCustomCheckboxes.forEach(checkbox => {
+            const customIndex = checkbox.dataset.customIndex;
+            const customKey = 'custom_' + customIndex;
+            checkbox.checked = selectedAPIs.includes(customKey);
+        });
+        
+        // 更新选中的API数量显示
+        if (typeof updateSelectedApiCount === 'function') {
+            updateSelectedApiCount();
+        }
+        
+        console.log('[同步] 已更新数据源选择UI');
+    } catch (e) {
+        console.error('更新数据源选择UI失败:', e);
+    }
 }
 
 // 降级到localStorage作为备份
@@ -484,9 +556,14 @@ function initUserSync() {
     // 添加强制云端同步选项
     const forceCloudflareSyncToggle = document.getElementById('forceCloudflareSyncToggle');
     if (forceCloudflareSyncToggle) {
-        // 初始化开关状态
-        const currentState = localStorage.getItem('forceCloudflareSync') === 'true';
-        forceCloudflareSyncToggle.checked = currentState;
+        // 初始化开关状态 - 默认设置为true，特别是针对移动设备
+        let currentState = localStorage.getItem('forceCloudflareSync');
+        if (currentState === null) {
+            // 如果localStorage中没有设置，默认启用强制云端同步
+            currentState = 'true';
+            localStorage.setItem('forceCloudflareSync', currentState);
+        }
+        forceCloudflareSyncToggle.checked = currentState === 'true';
         
         // 添加事件监听器
         forceCloudflareSyncToggle.addEventListener('change', function() {
@@ -494,6 +571,23 @@ function initUserSync() {
             localStorage.setItem('forceCloudflareSync', isEnabled ? 'true' : 'false');
             showToast(isEnabled ? '已启用强制云端同步' : '已禁用强制云端同步', 'info');
         });
+    }
+    
+    // 添加移动设备特定的同步提示
+    if (isMobileDevice()) {
+        // 查找同步功能区域 - 由于没有特定ID，我们使用包含特定元素的div
+        const syncSection = document.querySelector('div:has(#forceCloudflareSyncToggle)');
+        if (syncSection) {
+            // 检查是否已经存在移动设备提示
+            let mobileHint = document.querySelector('#mobileSyncHint');
+            if (!mobileHint) {
+                mobileHint = document.createElement('div');
+                mobileHint.id = 'mobileSyncHint';
+                mobileHint.className = 'text-sm text-blue-600 mt-2 bg-blue-50 p-2 rounded';
+                mobileHint.innerHTML = '<i class="fa fa-info-circle mr-1"></i> 移动设备同步提示：请确保已连接到稳定网络，并已启用"强制云端同步"选项';
+                syncSection.appendChild(mobileHint);
+            }
+        }
     }
     
     // 监听libreTvSyncCompleted事件，更新UI

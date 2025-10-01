@@ -13,6 +13,10 @@ let episodesReversed = false;
 
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function () {
+    // 初始化变量 - 从localStorage获取数据，如果没有则使用默认值
+    selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '[]');
+    customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]');
+
     // 初始化API复选框
     initAPICheckboxes();
 
@@ -26,10 +30,14 @@ document.addEventListener('DOMContentLoaded', function () {
     renderSearchHistory();
 
     // 设置默认API选择（如果是第一次加载）
-    if (!localStorage.getItem('hasInitializedDefaults')) {
+    if (!localStorage.getItem('hasInitializedDefaults') || selectedAPIs.length === 0) {
         // 默认选中资源
         selectedAPIs = ["tyyszy", "bfzy", "dyttzy", "ruyi"];
         localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+        
+        // 重新初始化API复选框
+        initAPICheckboxes();
+        updateSelectedApiCount();
 
         // 默认选中过滤开关
         localStorage.setItem('yellowFilterEnabled', 'true');
