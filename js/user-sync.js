@@ -45,11 +45,11 @@ function isRunningInCloudflare() {
         return true;
     }
     
-    // 检查方法3: 尝试通过请求头或特定响应特征检测
-    // 这个函数在运行时会被多次调用，我们只需要返回一个保守的判断
-    // 对于自定义域名，我们采用默认策略：优先尝试云端同步
-    // 因为如果尝试失败，系统会自动降级到本地存储
-    return true;
+    // 检查方法3: 手动配置选项
+    // 为了解决本地开发环境或自定义域名环境中的同步问题，
+    // 我们添加一个手动配置选项，默认为false，避免在非Cloudflare环境中尝试访问不存在的端点
+    const forceCloudflareSync = localStorage.getItem('forceCloudflareSync') === 'true';
+    return forceCloudflareSync;
 }
 
 // 获取需要同步的数据
@@ -135,9 +135,27 @@ async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000)
     try {
         const response = await fetch(url, options);
         if (!response.ok) {
-            throw new Error(`HTTP错误: ${response.status}`);
+            // 对于非200响应，尝试解析JSON错误信息
+            let errorMessage = `HTTP错误: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.message) {
+                    errorMessage = errorData.message;
+                }
+            } catch (e) {
+                // 如果无法解析JSON，继续使用原始错误消息
+            }
+            throw new Error(errorMessage);
         }
-        return await response.json();
+        
+        // 尝试解析JSON响应
+        try {
+            return await response.json();
+        } catch (jsonError) {
+            console.error('解析响应JSON失败:', jsonError);
+            // 即使JSON解析失败，也返回一个成功的响应，以便调用者知道请求本身是成功的
+            return { success: true, rawData: await response.text() };
+        }
     } catch (error) {
         console.warn(`请求失败 (${url}): ${error.message}`);
         
@@ -148,8 +166,9 @@ async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000)
             return fetchWithRetry(url, options, retries - 1, retryDelay * 2); // 指数退避
         }
         
-        // 所有重试都失败
-        throw error;
+        // 所有重试都失败，返回失败的响应对象，而不是抛出错误
+        // 这样调用者可以更优雅地处理错误
+        return { success: false, message: error.message };
     }
 }
 
@@ -256,9 +275,13 @@ function loadSyncedData() {
     const isCloudflareEnv = isRunningInCloudflare();
     
     if (isCloudflareEnv) {
+        console.log(`[同步] 尝试从云端加载数据，用户ID: ${userId}`);
+        
         // 发送请求到Cloudflare Function获取数据
         fetchWithRetry(`/user-sync?userId=${userId}`)
         .then(result => {
+            console.log('[同步] 云端请求结果:', result);
+            
             if (result.success && result.data) {
                 try {
                     if (saveDataToLocal(result.data)) {
@@ -279,20 +302,20 @@ function loadSyncedData() {
                     showToast('数据保存失败', 'error');
                 }
             } else {
-                console.log(`[同步] 用户ID: ${userId}，云端暂无同步数据`);
+                console.log(`[同步] 用户ID: ${userId}，云端暂无同步数据或请求失败`, result.message || '未知错误');
                 
                 // 尝试从localStorage备份加载数据
                 loadFromLocalStorageBackup(userId);
                 
-                showToast('当前用户无同步数据', 'info');
+                showToast(result.message || '当前用户无同步数据', 'info');
             }
         })
         .catch(error => {
-            console.error('[同步] 从云端加载数据失败:', error);
+            console.error('[同步] 从云端加载数据捕获到异常:', error);
             // 尝试从localStorage备份加载数据
             loadFromLocalStorageBackup(userId);
             
-            showToast('数据拉取失败，请检查网络连接', 'error');
+            showToast(`数据拉取失败: ${error.message || '未知错误'}`, 'error');
         })
         .finally(() => {
             // 无论成功失败，都要释放锁
@@ -301,9 +324,14 @@ function loadSyncedData() {
             }, 1000);
         });
     } else {
+        console.log(`[同步] 非Cloudflare环境，尝试从localStorage备份加载数据，用户ID: ${userId}`);
+        
         // 非Cloudflare环境，尝试从localStorage备份加载数据
         loadFromLocalStorageBackup(userId);
         syncingInProgress = false;
+        
+        // 显示提示信息
+        showToast('当前环境不支持云端同步，使用本地备份', 'info');
     }
     
     return true;
@@ -450,6 +478,21 @@ function initUserSync() {
             window._lastEvent = event;
             showToast('正在拉取数据...', 'info');
             loadSyncedData();
+        });
+    }
+    
+    // 添加强制云端同步选项
+    const forceCloudflareSyncToggle = document.getElementById('forceCloudflareSyncToggle');
+    if (forceCloudflareSyncToggle) {
+        // 初始化开关状态
+        const currentState = localStorage.getItem('forceCloudflareSync') === 'true';
+        forceCloudflareSyncToggle.checked = currentState;
+        
+        // 添加事件监听器
+        forceCloudflareSyncToggle.addEventListener('change', function() {
+            const isEnabled = this.checked;
+            localStorage.setItem('forceCloudflareSync', isEnabled ? 'true' : 'false');
+            showToast(isEnabled ? '已启用强制云端同步' : '已禁用强制云端同步', 'info');
         });
     }
     
