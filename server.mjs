@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const config = {
-  port: process.env.PORT || 8080,
+  port: process.env.PORT || 8081,
   password: process.env.PASSWORD || '',
   adminpassword: process.env.ADMINPASSWORD || '',
   corsOrigin: process.env.CORS_ORIGIN || '*',

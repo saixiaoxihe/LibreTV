@@ -47,6 +47,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (yellowFilterToggle) {
         yellowFilterToggle.checked = localStorage.getItem('yellowFilterEnabled') === 'true';
     }
+    
+    // 增强数据存储功能以支持用户同步
+    if (window.enhanceDataStorageFunctions) {
+        window.enhanceDataStorageFunctions();
+    }
 
     // 设置广告过滤开关初始状态
     const adFilterToggle = document.getElementById('adFilterToggle');
