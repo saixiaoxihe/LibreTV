@@ -25,17 +25,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // 渲染搜索历史
     renderSearchHistory();
 
-    // 初始化用户数据同步功能
-    initUserDataSync();
-    
-    // 显示当前用户ID
-    document.getElementById('currentUserId').textContent = getCurrentUserId();
-
     // 设置默认API选择（如果是第一次加载）
     if (!localStorage.getItem('hasInitializedDefaults')) {
         // 默认选中资源
         selectedAPIs = ["tyyszy", "bfzy", "dyttzy", "ruyi"];
-        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+        saveData('selectedAPIs', selectedAPIs).catch(err => console.error('同步失败:', err));
 
         // 默认选中过滤开关
         localStorage.setItem('yellowFilterEnabled', 'true');
@@ -114,7 +108,7 @@ function initAPICheckboxes() {
     checkAdultAPIsSelected();
 }
 
-// 设置成人API列表
+// 添加成人API列表
 function addAdultAPI() {
     // 仅在隐藏设置为false时添加成人API组
     if (!HIDE_BUILTIN_ADULT_APIS && (localStorage.getItem('yellowFilterEnabled') === 'false')) {
@@ -159,26 +153,6 @@ function addAdultAPI() {
         });
         container.appendChild(adultdiv);
     }
-}
-
-// 用户ID保存功能
-window.saveUserId = function() {
-    const userIdInput = document.getElementById('userIdInput');
-    const newUserId = userIdInput.value.trim();
-    
-    if (!newUserId) {
-        showToast('请输入六位数ID', 'error');
-        return;
-    }
-    
-    // 调用setUserId函数来设置新的用户ID并同步数据
-    setUserId(newUserId).then(success => {
-        if (success) {
-            // 更新UI显示
-            document.getElementById('currentUserId').textContent = newUserId;
-            userIdInput.value = '';
-        }
-    });
 }
 
 // 检查是否有成人API被选中
@@ -319,7 +293,7 @@ function updateCustomApi(index) {
     if (url.endsWith('/')) url = url.slice(0, -1);
     // 保存 detail 字段
     customAPIs[index] = { name, url, detail, isAdult };
-    localStorage.setItem('customAPIs', JSON.stringify(customAPIs));
+    saveData('customAPIs', customAPIs).catch(err => console.error('同步失败:', err));
     renderCustomAPIsList();
     checkAdultAPIsSelected();
     restoreAddCustomApiButtons();
@@ -504,33 +478,6 @@ function removeCustomApi(index) {
     checkAdultAPIsSelected();
 
     showToast('已移除自定义API: ' + apiName, 'info');
-}
-
-// 保存用户ID
-function saveUserId() {
-    const userIdInput = document.getElementById('userIdInput');
-    const userId = userIdInput.value.trim();
-    
-    if (!userId) {
-        // 如果用户没有输入ID，生成一个新的ID
-        const newUserId = generateUserId();
-        setUserId(newUserId).then(success => {
-            if (success) {
-                document.getElementById('currentUserId').textContent = newUserId;
-                userIdInput.value = '';
-                showToast('已生成新的用户ID', 'success');
-            }
-        });
-        return;
-    }
-    
-    // 验证并设置用户ID
-    setUserId(userId).then(success => {
-        if (success) {
-            document.getElementById('currentUserId').textContent = userId;
-            userIdInput.value = '';
-        }
-    });
 }
 
 function toggleSettings(e) {
@@ -907,7 +854,44 @@ function hookInput() {
     // 初始化输入框值为空字符串（避免初始值为 undefined）
     input.value = '';
 }
-document.addEventListener('DOMContentLoaded', hookInput);
+// 用户ID生成与验证
+// 生成并保存用户ID
+function initUserId() {
+  if (!localStorage.getItem('userId')) {
+    localStorage.setItem('userId', generateUserID());
+  }
+}
+
+function generateUserID() {
+  return Math.floor(100000 + Math.random() * 900000);
+}
+
+// 统一数据存储方法
+async function saveData(key, value) {
+  const userId = localStorage.getItem('userId');
+  if (userId) {
+    try {
+      const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId, key, value})
+      });
+      if (!response.ok) throw new Error('同步失败');
+      return await response.text();
+    } catch (e) {
+      console.error('云同步失败，回退到本地存储:', e);
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } else {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  return Promise.resolve();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initUserId();
+  hookInput();
+});
 
 // 显示详情 - 修改为支持自定义API
 async function showDetails(id, vod_name, sourceCode) {

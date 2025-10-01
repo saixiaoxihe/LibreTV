@@ -16,7 +16,6 @@
     <script src="libs/tailwindcss.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/index.css">
-    <script src="js/userDataSync.js"></script>
 </head>
 <body class="page-bg text-white">
     <!-- 将历史记录按钮移到左上角，并缩小尺寸 -->
@@ -124,25 +123,6 @@
                 </div>
             </div>
             
-            <!-- 用户ID同步设置区域 -->
-            <div class="p-3 bg-[#151515] rounded-lg shadow-inner">
-                <label class="block text-sm font-medium text-gray-400 mb-3 border-b border-[#333] pb-1">用户数据同步</label>
-                
-                <div class="mb-3">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs text-gray-400">当前用户ID</span>
-                        <span id="currentUserId" class="text-white font-mono"></span>
-                    </div>
-                    <div class="flex gap-2">
-                        <input type="text" id="userIdInput" placeholder="输入六位数ID同步数据" class="w-full bg-[#222] border border-[#333] text-white px-2 py-2 rounded" maxlength="6" pattern="\d{6}" autocomplete="off">
-                        <button id="saveUserIdBtn" onclick="saveUserId()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm transition-colors">
-                            保存
-                        </button>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">不输入ID则数据保留在本地浏览器。输入相同ID可在不同设备间同步观看记录。</p>
-                </div>
-            </div>
-
             <!-- 内容过滤设置区域 -->
             <div class="p-3 bg-[#151515] rounded-lg shadow-inner">
                 <label class="block text-sm font-medium text-gray-400 mb-3 border-b border-[#333] pb-1">功能开关</label>

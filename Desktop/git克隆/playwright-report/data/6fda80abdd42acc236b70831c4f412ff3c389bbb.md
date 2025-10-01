@@ -1,0 +1,172 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - button "观看历史" [ref=e3] [cursor=pointer]:
+    - img [ref=e4] [cursor=pointer]
+  - button "打开设置" [ref=e7] [cursor=pointer]:
+    - img [ref=e8] [cursor=pointer]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - button [ref=e13] [cursor=pointer]:
+        - img [ref=e14] [cursor=pointer]
+      - heading [level=3] [ref=e16]: 观看历史
+    - generic [ref=e18]: 暂无观看记录
+    - button [ref=e20] [cursor=pointer]: 清空历史记录
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - heading [level=3] [ref=e23]: 设置
+      - button [ref=e24] [cursor=pointer]:
+        - img [ref=e25] [cursor=pointer]
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]: 数据源设置
+        - generic [ref=e30]:
+          - button [ref=e31] [cursor=pointer]: 全选
+          - button [ref=e32] [cursor=pointer]: 全不选
+          - button [ref=e33] [cursor=pointer]: 全选普通资源
+        - generic [ref=e36]:
+          - generic [ref=e37]: 普通资源
+          - generic [ref=e38]:
+            - checkbox [checked] [ref=e39] [cursor=pointer]
+            - generic [ref=e40]: 电影天堂资源
+          - generic [ref=e41]:
+            - checkbox [checked] [ref=e42] [cursor=pointer]
+            - generic [ref=e43]: 如意资源
+          - generic [ref=e44]:
+            - checkbox [checked] [ref=e45] [cursor=pointer]
+            - generic [ref=e46]: 暴风资源
+          - generic [ref=e47]:
+            - checkbox [checked] [ref=e48] [cursor=pointer]
+            - generic [ref=e49]: 天涯资源
+          - generic [ref=e50]:
+            - checkbox [ref=e51] [cursor=pointer]
+            - generic [ref=e52]: 小猫咪资源
+          - generic [ref=e53]:
+            - checkbox [ref=e54] [cursor=pointer]
+            - generic [ref=e55]: 非凡影视
+          - generic [ref=e56]:
+            - checkbox [ref=e57] [cursor=pointer]
+            - generic [ref=e58]: 黑木耳
+          - generic [ref=e59]:
+            - checkbox [ref=e60] [cursor=pointer]
+            - generic [ref=e61]: 360资源
+          - generic [ref=e62]:
+            - checkbox [ref=e63] [cursor=pointer]
+            - generic [ref=e64]: iqiyi资源
+          - generic [ref=e65]:
+            - checkbox [ref=e66] [cursor=pointer]
+            - generic [ref=e67]: 卧龙资源
+          - generic [ref=e68]:
+            - checkbox [ref=e69] [cursor=pointer]
+            - generic [ref=e70]: 华为吧资源
+          - generic [ref=e71]:
+            - checkbox [ref=e72] [cursor=pointer]
+            - generic [ref=e73]: 极速资源
+          - generic [ref=e74]:
+            - checkbox [ref=e75] [cursor=pointer]
+            - generic [ref=e76]: 豆瓣资源
+          - generic [ref=e77]:
+            - checkbox [ref=e78] [cursor=pointer]
+            - generic [ref=e79]: 魔爪资源
+          - generic [ref=e80]:
+            - checkbox [ref=e81] [cursor=pointer]
+            - generic [ref=e82]: 魔都资源
+          - generic [ref=e83]:
+            - checkbox [ref=e84] [cursor=pointer]
+            - generic [ref=e85]: 最大资源
+          - generic [ref=e86]:
+            - checkbox [ref=e87] [cursor=pointer]
+            - generic [ref=e88]: 樱花资源
+          - generic [ref=e89]:
+            - checkbox [ref=e90] [cursor=pointer]
+            - generic [ref=e91]: 百度云资源
+          - generic [ref=e92]:
+            - checkbox [ref=e93] [cursor=pointer]
+            - generic [ref=e94]: 无尽资源
+          - generic [ref=e95]:
+            - checkbox [ref=e96] [cursor=pointer]
+            - generic [ref=e97]: 旺旺短剧
+          - generic [ref=e98]:
+            - checkbox [ref=e99] [cursor=pointer]
+            - generic [ref=e100]: iKun资源
+          - generic [ref=e101]:
+            - checkbox [ref=e102] [cursor=pointer]
+            - generic [ref=e103]: 量子资源站
+          - generic [ref=e104]:
+            - checkbox [ref=e105] [cursor=pointer]
+            - generic [ref=e106]: 七七资源
+        - generic [ref=e108]:
+          - text: 已选API数量：
+          - generic [ref=e109]: "4"
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - generic [ref=e112]: 自定义API
+          - button [ref=e113] [cursor=pointer]: +
+        - paragraph [ref=e115]: 未添加自定义API
+      - generic [ref=e116]:
+        - generic [ref=e117]: 功能开关
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - generic [ref=e121]: 黄色内容过滤
+            - paragraph [ref=e122]: 过滤"伦理片"等黄色内容
+          - checkbox [checked] [ref=e124] [cursor=pointer]
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]: 分片广告过滤
+            - paragraph [ref=e130]: 关闭可减少旧版浏览器卡顿
+          - checkbox [checked] [ref=e132] [cursor=pointer]
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]: 豆瓣热门推荐
+            - paragraph [ref=e138]: 首页显示豆瓣热门影视内容
+          - checkbox [ref=e140] [cursor=pointer]
+      - generic [ref=e143]:
+        - generic [ref=e144]: 一般功能
+        - button [ref=e145] [cursor=pointer]: 导入配置
+        - button [ref=e146] [cursor=pointer]: 导出配置
+        - button [ref=e147] [cursor=pointer]: 清除Cookie
+  - generic [ref=e149]:
+    - banner [ref=e150]:
+      - link "LibreTV" [ref=e152] [cursor=pointer]:
+        - /url: "#"
+        - img [ref=e153] [cursor=pointer]
+        - heading "LibreTV" [level=1] [ref=e155] [cursor=pointer]
+      - paragraph [ref=e156]: 自由观影，畅享精彩
+    - generic [ref=e159]:
+      - button "返回首页" [ref=e160] [cursor=pointer]: 首页
+      - textbox "视频搜索框" [ref=e161]
+      - button "搜索按钮" [ref=e162] [cursor=pointer]: 搜索
+  - contentinfo [ref=e163]:
+    - generic [ref=e165]:
+      - generic [ref=e166]:
+        - generic [ref=e167]:
+          - img [ref=e168]
+          - generic [ref=e170]: LibreTV
+        - paragraph [ref=e171]: © 2025 LibreTV - 自由观影，畅享精彩
+      - generic [ref=e172]:
+        - paragraph [ref=e173]: 免责声明：本站仅为视频搜索工具，不存储、上传或分发任何视频内容。 所有视频均来自第三方API接口。如有侵权，请联系相关内容提供方。
+        - generic [ref=e174]:
+          - link "关于我们" [ref=e175] [cursor=pointer]:
+            - /url: about.html
+          - link "隐私政策" [ref=e176] [cursor=pointer]:
+            - /url: about.html
+          - link "捐赠" [ref=e177] [cursor=pointer]:
+            - /url: https://www.msf.hk/zh-hant/donate/general?type=one-off
+  - generic [ref=e179]:
+    - heading "使用声明" [level=2] [ref=e180]
+    - generic [ref=e181]:
+      - paragraph [ref=e182]: 欢迎使用 LibreTV。在开始使用前，请您了解并同意以下条款：
+      - paragraph [ref=e183]:
+        - strong [ref=e184]: 服务性质：
+        - text: LibreTV 仅提供视频搜索服务，不直接提供、存储或上传任何视频内容。所有搜索结果均来自第三方公开接口。
+      - paragraph [ref=e185]:
+        - strong [ref=e186]: 用户责任：
+        - text: 用户在使用本站服务时，须遵守相关法律法规，不得利用搜索结果从事侵权行为，如下载、传播未经授权的作品等。
+      - paragraph [ref=e187]:
+        - strong [ref=e188]: 广告风险提示：
+        - text: 本站所有视频均来自第三方采集站，视频中出现的广告与本站无关，请勿相信或点击视频中的任何广告内容，谨防上当受骗。
+    - button "我已了解并接受" [ref=e190] [cursor=pointer]
+  - generic:
+    - paragraph
+```

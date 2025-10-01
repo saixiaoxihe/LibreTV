@@ -56,15 +56,6 @@ function goBack(event) {
 
 // 页面加载时保存当前URL到localStorage，作为返回目标
 window.addEventListener('load', function () {
-    // 引入用户数据同步脚本
-    const userDataSyncScript = document.createElement('script');
-    userDataSyncScript.src = 'js/userDataSync.js';
-    userDataSyncScript.onload = function() {
-        // 初始化用户数据同步
-        initUserDataSync();
-    };
-    document.head.appendChild(userDataSyncScript);
-
     // 保存前一页面URL
     if (document.referrer && document.referrer !== window.location.href) {
         localStorage.setItem('lastPageUrl', document.referrer);
@@ -1176,13 +1167,7 @@ function saveToHistory() {
         if (history.length > 50) history.splice(50);
 
         localStorage.setItem('viewingHistory', JSON.stringify(history));
-        
-        // 如果用户已登录，同步数据到云端
-        if (typeof syncHistoryToCloud === 'function') {
-            syncHistoryToCloud();
-        }
     } catch (e) {
-        console.error('保存历史记录失败:', e);
     }
 }
 
@@ -1280,15 +1265,8 @@ function saveCurrentProgress() {
                 }
             }
         } catch (e) {
-            console.error('更新历史记录进度失败:', e);
-        }
-        
-        // 如果用户已登录，同步数据到云端
-        if (typeof syncProgressToCloud === 'function') {
-            syncProgressToCloud(getVideoId(), progressData);
         }
     } catch (e) {
-        console.error('保存播放进度失败:', e);
     }
 }
 
@@ -1412,13 +1390,7 @@ function clearVideoProgress() {
     const progressKey = `videoProgress_${getVideoId()}`;
     try {
         localStorage.removeItem(progressKey);
-        
-        // 如果用户已登录，同步数据到云端
-        if (typeof syncProgressToCloud === 'function') {
-            syncProgressToCloud(getVideoId(), null); // null表示清除
-        }
     } catch (e) {
-        console.error('清除播放进度失败:', e);
     }
 }
 
