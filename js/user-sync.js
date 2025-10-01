@@ -81,6 +81,14 @@ function getSyncableData() {
         
         // 同步搜索历史
         data.searchHistory = JSON.parse(localStorage.getItem('videoSearchHistory') || '[]');
+        
+        console.log('[同步] 收集到的数据类型:', {
+            viewingHistory: data.viewingHistory.length,
+            selectedAPIs: data.selectedAPIs.length,
+            customAPIs: data.customAPIs.length,
+            searchHistory: data.searchHistory.length,
+            filters: { yellow: data.yellowFilterEnabled, ad: data.adFilterEnabled, douban: data.doubanEnabled }
+        });
     } catch (e) {
         console.error('获取同步数据失败:', e);
     }
@@ -145,16 +153,17 @@ async function fetchWithRetry(url, options = {}, retries = 2, retryDelay = 1000)
     }
 }
 
-// 同步数据到云端（Cloudflare KV）
 // 添加一个锁，防止短时间内重复调用
 let syncingInProgress = false;
 let lastSyncTime = 0;
 const MIN_SYNC_INTERVAL = 30000; // 最小同步间隔，30秒
 
+// 同步数据到云端（Cloudflare KV）
 function syncDataToCloud() {
     // 检查是否正在同步中
     if (syncingInProgress) {
         console.log('[同步] 同步操作正在进行中，跳过此次调用');
+        showToast('同步操作正在进行中，请稍后再试', 'info');
         return false;
     }
     
@@ -162,6 +171,7 @@ function syncDataToCloud() {
     const now = Date.now();
     if (now - lastSyncTime < MIN_SYNC_INTERVAL) {
         console.log('[同步] 距离上次同步时间过短，跳过此次调用');
+        showToast('操作过于频繁，请稍后再试', 'info');
         return false;
     }
     
@@ -193,9 +203,12 @@ function syncDataToCloud() {
                 // 更新最后同步时间
                 lastSyncTime = now;
                 localStorage.setItem('lastSyncTime', now.toString());
+                
+                // 显示成功提示
+                showToast('数据上传成功', 'success');
             } else {
                 console.error('[同步] 同步数据到云端失败:', result.message);
-                showToast(`数据同步失败: ${result.message}`, 'error');
+                showToast(`数据上传失败: ${result.message || '未知错误'}`, 'error');
                 
                 // 降级到localStorage作为备份
                 fallbackToLocalStorage(userId, data);
@@ -203,7 +216,7 @@ function syncDataToCloud() {
         })
         .catch(error => {
             console.error('[同步] 同步数据到云端网络错误:', error);
-            showToast('数据同步失败，请检查网络连接', 'error');
+            showToast('数据上传失败，请检查网络连接', 'error');
             
             // 降级到localStorage作为备份
             fallbackToLocalStorage(userId, data);
@@ -218,6 +231,9 @@ function syncDataToCloud() {
         // 非Cloudflare环境，使用localStorage作为备份
         fallbackToLocalStorage(userId, data);
         syncingInProgress = false;
+        
+        // 显示本地备份提示
+        showToast('已保存到本地备份', 'info');
     }
     
     return true;
@@ -231,6 +247,8 @@ function loadSyncedData() {
         showToast('同步操作正在进行中，请稍后再试', 'info');
         return false;
     }
+    
+    syncingInProgress = true;
     
     const userId = getUserId();
     
@@ -246,13 +264,10 @@ function loadSyncedData() {
                     if (saveDataToLocal(result.data)) {
                         console.log(`[同步] 用户ID: ${userId}，已从Cloudflare KV加载数据`);
                         
-                        // 只在用户主动点击操作时显示提示
-                        const event = window.event || window._lastEvent;
-                        if (event && event.type === 'click') {
-                            showToast('数据同步成功', 'success');
-                        }
+                        // 显示成功提示
+                        showToast('数据拉取成功', 'success');
                         
-                        // 不使用location.reload()，而是触发自定义事件让其他组件更新
+                        // 触发自定义事件让其他组件更新
                         const syncEvent = new CustomEvent('libreTvSyncCompleted', { detail: result.data });
                         document.dispatchEvent(syncEvent);
                         
@@ -269,11 +284,7 @@ function loadSyncedData() {
                 // 尝试从localStorage备份加载数据
                 loadFromLocalStorageBackup(userId);
                 
-                // 只在用户主动点击操作时显示提示
-                const event = window.event || window._lastEvent;
-                if (event && event.type === 'click') {
-                    showToast('当前用户无同步数据', 'info');
-                }
+                showToast('当前用户无同步数据', 'info');
             }
         })
         .catch(error => {
@@ -281,15 +292,18 @@ function loadSyncedData() {
             // 尝试从localStorage备份加载数据
             loadFromLocalStorageBackup(userId);
             
-            // 避免在页面自动加载时显示错误提示
-            const event = window.event || window._lastEvent;
-            if (event && event.type === 'click') {
-                showToast('数据加载失败，请检查网络连接', 'error');
-            }
+            showToast('数据拉取失败，请检查网络连接', 'error');
+        })
+        .finally(() => {
+            // 无论成功失败，都要释放锁
+            setTimeout(() => {
+                syncingInProgress = false;
+            }, 1000);
         });
     } else {
         // 非Cloudflare环境，尝试从localStorage备份加载数据
         loadFromLocalStorageBackup(userId);
+        syncingInProgress = false;
     }
     
     return true;
