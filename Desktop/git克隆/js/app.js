@@ -50,6 +50,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 在页面加载完成后立即加载用户ID
     loadUserId();
+    
+    // 在窗口完全加载后再次尝试加载用户ID，确保所有元素都已渲染
+    window.addEventListener('load', function() {
+        setTimeout(loadUserId, 500);
+    });
 
     // 设置广告过滤开关初始状态
     const adFilterToggle = document.getElementById('adFilterToggle');
